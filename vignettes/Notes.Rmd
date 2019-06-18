@@ -1,0 +1,66 @@
+---
+title: "BIS Project Notes"
+author: "Haoyu Sheng"
+date: "6/18/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MPHM)
+library(dplyr)
+library(knitr)
+library(purrr)
+```
+
+## Reading Data
+
+We can use the `read_hc` function to read the house credit data. 
+
+```{r read, warning=FALSE}
+hc <- read_hc("../data/HouseCredit_data.xlsx")
+kable(head(hc[1:4]))
+```
+
+There are `r ncol(hc)` columns and `r nrow(hc)` rows in the housing credit dataset. 
+
+We can use the `read_pp` function to read the property price data. 
+
+```{r}
+pp <- read_pp("../data/pp_long.xlsx")
+kable(head(pp[13:18]))
+```
+
+There are `r ncol(pp)` columns and `r nrow(pp)` rows in the property dataset. 
+
+We can use the `read_mp` function to read the macroprudential policy actions. 
+
+```{r mp, warning=FALSE}
+# The list of all actions. We can choose from this list what actions we want to look at
+indicators <- c("Housing_FX_limit", "Housing_LLprovisioning", "Housing_LTV", 
+                "Housing_OtherCapital", "Housing_RiskWeights", "Housing_tax", "LD_Ratio")
+mp = lapply(indicators, read_mp, path = "../data/MacroprudentialIndicators.xlsx") %>%
+  reduce(full_join, by = "date")
+kable(head(mp[1:4]))
+```
+
+There are `r ncol(mp)` columns and `r nrow(mp)` rows in the macroprudential action dataset. 
+
+
+## Finding Intersection
+
+We want to find periods in which all data were available for a certain country. We can use `merge_dat` to merge `hc`, `pp`, and `mp` data. We use `find_intersect` to filter out country-specific information. 
+
+```{r merge}
+dat = list("mp" = mp, "hc" = hc, "pp" = pp) 
+# List of all countries
+country_list <- colnames(hc)[-1]
+# Merging all the 
+all_dat <- merge_dat(dat, all = TRUE)
+inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE.NAMES = TRUE) 
+kable(head(inter$AU[7:10])) 
+```
+
+Taking a quick look at the intersection data for AU(Australia), there are `r ncol(inter$AU)` columns and `r nrow(inter$AU)` rows in this dataset, indicating `r nrow(inter$AU)` entries are present for all three data series. 
+
+

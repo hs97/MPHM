@@ -74,20 +74,20 @@ mp_hc_dates <- find_start_end_all(country_list = country_list, dat = mp_hc, dat_
 hc_pp_dates <- find_start_end_all(country_list = country_list, dat = hc_pp, dat_name = "hc_pp")
 all_dates <- find_start_end_all(country_list = country_list, dat = all_dat, dat_name = "all")
 
-dates <- list(hc_dates, pp_dates, mp_dates, mp_pp_dates, hc_pp_dates, all_dates) %>%
+dates <- list(hc_dates, pp_dates, mp_dates, mp_pp_dates, mp_hc_dates, hc_pp_dates, all_dates) %>%
   reduce(full_join, by = "Country")
-  
+
 kable(head(dates[1:8]))
 
 ```
+
+
+We can use `find_intersect` to collect the detailed intersection data, and use the data in analysis.  
 
 ```{r}
 inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE.NAMES = TRUE) 
 kable(head(inter$AU[7:10]))
 ```
-
-
-
 
 
 Taking a quick look at the intersection data for AU(Australia), there are `r ncol(inter$AU)` columns and `r nrow(inter$AU)` rows in this dataset, indicating `r nrow(inter$AU)` entries are present for all three data series. 

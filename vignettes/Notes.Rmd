@@ -35,11 +35,16 @@ There are `r ncol(pp)` columns and `r nrow(pp)` rows in the property dataset.
 
 We can use the `read_mp` function to read the macroprudential policy actions. 
 
+
 ```{r mp, warning=FALSE}
 # The list of all actions. We can choose from this list what actions we want to look at
 indicators <- c("Housing_FX_limit", "Housing_LLprovisioning", "Housing_LTV", 
                 "Housing_OtherCapital", "Housing_RiskWeights", "Housing_tax", "LD_Ratio")
 mp = lapply(indicators, read_mp, path = "../data/MacroprudentialIndicators.xlsx") %>%
+  reduce(full_join, by = "date")
+path = "../data/FinalDATA_11June2018.xlsx"
+cy <- read_cy(path)
+mp <- apply(cy, 1, mp_reduce_range, mp = mp) %>%
   reduce(full_join, by = "date")
 kable(head(mp[1:4]))
 ```
@@ -49,17 +54,41 @@ There are `r ncol(mp)` columns and `r nrow(mp)` rows in the macroprudential acti
 
 ## Finding Intersection
 
-We want to find periods in which all data were available for a certain country. We can use `merge_dat` to merge `hc`, `pp`, and `mp` data. We use `find_intersect` to filter out country-specific information. 
+We want to find periods in which all data were available for a certain country. We can use `merge_dat` to merge `hc`, `pp`, and `mp` data. We use `find_intersect` to filter out country-specific information. We can use `find_start_end_all` to find the start and end dates for all countries' data availability in a given dataset. 
 
-```{r merge}
+```{r merge, warning=FALSE}
 dat = list("mp" = mp, "hc" = hc, "pp" = pp) 
 # List of all countries
-country_list <- colnames(hc)[-1]
-# Merging all the 
+country_list <- colnames(hc)[colnames(hc) != "date"]
+# All possible combinations for merging
 all_dat <- merge_dat(dat, all = TRUE)
-inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE.NAMES = TRUE) 
-kable(head(inter$AU[7:10])) 
+mp_pp <- merge_dat(dat, first = "mp", second = "pp") 
+mp_hc <- merge_dat(dat, first = "mp", second = "hc") 
+hc_pp <- merge_dat(dat, first = "hc", second = "pp") 
+
+hc_dates <- find_start_end_all(country_list = country_list, dat = hc, dat_name = "hc")
+pp_dates <- find_start_end_all(country_list = country_list, dat = pp, dat_name = "pp")
+mp_dates <- find_start_end_all(country_list = country_list, dat = mp, dat_name = "mp")
+mp_pp_dates <- find_start_end_all(country_list = country_list, dat = mp_pp, dat_name = "mp_pp")
+mp_hc_dates <- find_start_end_all(country_list = country_list, dat = mp_hc, dat_name = "mp_hc")
+hc_pp_dates <- find_start_end_all(country_list = country_list, dat = hc_pp, dat_name = "hc_pp")
+all_dates <- find_start_end_all(country_list = country_list, dat = all_dat, dat_name = "all")
+
+dates <- list(hc_dates, pp_dates, mp_dates, mp_pp_dates, hc_pp_dates, all_dates) %>%
+  reduce(full_join, by = "Country")
+  
+kable(head(dates[1:8]))
+
 ```
+
+```{r}
+inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE.NAMES = TRUE) 
+kable(head(inter$AU[7:10]))
+```
+
+
+
+
 
 Taking a quick look at the intersection data for AU(Australia), there are `r ncol(inter$AU)` columns and `r nrow(inter$AU)` rows in this dataset, indicating `r nrow(inter$AU)` entries are present for all three data series. 
 

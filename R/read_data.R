@@ -47,7 +47,29 @@ read_mp <- function(x, path){
   colnames(mp) <- paste(colnames(mp), x, sep = "_")
   mp %>%
     tibble::rownames_to_column("date") %>%
-    mutate(date = as.Date(as.numeric(date) - 1, origin = "1899-12-30")) %>% # Confirm -1
+    mutate(date = as.Date(as.numeric(date), origin = "1899-12-30")) %>% # Confirm -1
     na.omit() %>%
     mutate(date = as.yearqtr(date))
+}
+
+#' This function reads in coverage years for macroprudential actions.
+#' For end dates that are not the last day of the quarter, we set them
+#' to the quarters before.
+#'
+#' @param path is the file path
+#' @import readxl
+#' @import zoo
+#' @import dplyr
+#' @import timeDate
+#' @export
+
+read_cy <- function(path) {
+read_excel(path, sheet = "Coverage years") %>%
+  filter(!is.na(Country)) %>%
+  rename(mp_end = `Position (End) Date`) %>%
+  mutate(mp_start = as.yearqtr(paste(Start, "1", sep = "-"))) %>%
+  mutate(mp_end = if_else(mp_end == as.Date(timeLastDayInQuarter(mp_end)),
+                          as.yearqtr(mp_end),
+                          as.yearqtr(as.Date(timeFirstDayInQuarter(mp_end)) - 1))) %>%
+  select(Country, mp_start, mp_end)
 }

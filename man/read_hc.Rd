@@ -5,10 +5,12 @@
 \title{This function reads in the housing market data and cleans
 the date formatting}
 \usage{
-read_hc(x)
+read_hc(x, cpi)
 }
 \arguments{
 \item{x}{is the filepath to the credit data}
+
+\item{cpi}{is the cpi data we deflate with}
 }
 \description{
 This function reads in the housing market data and cleans

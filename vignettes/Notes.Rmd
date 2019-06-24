@@ -18,7 +18,11 @@ library(purrr)
 We can use the `read_hc` function to read the house credit data. 
 
 ```{r read, warning=FALSE}
-hc <- read_hc("../data/HouseCredit_data.xlsx")
+cpi <- read_cpi(x = "../data/cp1904.xlsx", y = "../data/MacroVar.xlsx")
+hc <- read_hc("../data/HouseCredit_data.xlsx", cpi)
+# List of all countries
+country_list <- colnames(hc)[colnames(hc) != "date"]
+
 kable(head(hc[1:4]))
 ```
 
@@ -27,8 +31,10 @@ There are `r ncol(hc)` columns and `r nrow(hc)` rows in the housing credit datas
 We can use the `read_pp` function to read the property price data. 
 
 ```{r}
-pp <- read_pp("../data/pp_long.xlsx")
-kable(head(pp[13:18]))
+# Read property prices and select appropriate prices. 
+pp <- read_pp(pps = "../data/pp_selected.xlsx", ppl = "../data/pp_long.xlsx", 
+              pp_saar = "../data/HousePrices_SA&AR.xlsx", country_list = country_list, cpi = cpi)
+kable(head(pp[1:6]))
 ```
 
 There are `r ncol(pp)` columns and `r nrow(pp)` rows in the property dataset. 
@@ -58,8 +64,6 @@ We want to find periods in which all data were available for a certain country. 
 
 ```{r merge, warning=FALSE}
 dat = list("mp" = mp, "hc" = hc, "pp" = pp) 
-# List of all countries
-country_list <- colnames(hc)[colnames(hc) != "date"]
 # All possible combinations for merging
 all_dat <- merge_dat(dat, all = TRUE)
 mp_pp <- merge_dat(dat, first = "mp", second = "pp") 

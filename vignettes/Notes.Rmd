@@ -15,7 +15,7 @@ library(purrr)
 
 ## Reading Data
 
-We can use the `read_hc` function to read the house credit data. 
+We can use the `read_hc` function to read the house credit data. The full cleaned house credit file can be found at `~/data/hc.csv`
 
 ```{r read, warning=FALSE}
 cpi <- read_cpi(x = "../data/cp1904.xlsx", y = "../data/MacroVar.xlsx")
@@ -28,7 +28,7 @@ kable(head(hc[1:4]))
 
 There are `r ncol(hc)` columns and `r nrow(hc)` rows in the housing credit dataset. 
 
-We can use the `read_pp` function to read the property price data. 
+We can use the `read_pp` function to read the property price data, deflate the data appropriately, and take log. The full cleaned property price data can be found at `~/data/pp.csv` 
 
 ```{r}
 # Read property prices and select appropriate prices. 
@@ -60,7 +60,7 @@ There are `r ncol(mp)` columns and `r nrow(mp)` rows in the macroprudential acti
 
 ## Finding Intersection
 
-We want to find periods in which all data were available for a certain country. We can use `merge_dat` to merge `hc`, `pp`, and `mp` data. We use `find_intersect` to filter out country-specific information. We can use `find_start_end_all` to find the start and end dates for all countries' data availability in a given dataset. 
+We want to find periods in which all data were available for a certain country. We can use `merge_dat` to merge `hc`, `pp`, and `mp` data. We use `find_intersect` to filter out country-specific information. We can use `find_start_end_all` to find the start and end dates for all countries' data availability in a given dataset. The dates dataset is saved in `~/data/dates.csv`
 
 ```{r merge, warning=FALSE}
 dat = list("mp" = mp, "hc" = hc, "pp" = pp) 
@@ -90,6 +90,7 @@ We can use `find_intersect` to collect the detailed intersection data, and use t
 
 ```{r}
 inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE.NAMES = TRUE) 
+bb <- lapply(country_list, bry_boschan, dat = hc)
 kable(head(inter$AU[7:10]))
 ```
 

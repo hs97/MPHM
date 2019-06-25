@@ -5,16 +5,15 @@
 \title{This function reads in the property price data and cleans
 the date formatting}
 \usage{
-read_pp(x, cpi, country_list)
+read_pp(pps, ppl, pp_saar, cpi, country_list)
 }
 \arguments{
-\item{x}{is the filepath to the price data}
-
 \item{cpi}{is the cpi data}
 
 \item{country_list}{is the list of countries}
+
+\item{x}{is the filepath to the price data}
 }
 \description{
-This function reads in the property price data and cleans
-the date formatting
+The returned data frame is deflated and in log form.
 }

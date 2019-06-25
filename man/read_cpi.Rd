@@ -2,13 +2,15 @@
 % Please edit documentation in R/read_data.R
 \name{read_cpi}
 \alias{read_cpi}
-\title{This function reads in the CPI data}
+\title{This function reads in the CPI data from two datasets.}
 \usage{
-read_cpi(x)
+read_cpi(x, y)
 }
 \arguments{
-\item{x}{is the filepath to the CPI data}
+\item{x}{is the filepath to the cp1904 spreadsheet}
+
+\item{y}{is the filepath to the MacroVar spreadsheet}
 }
 \description{
-This function reads in the CPI data
+This function reads in the CPI data from two datasets.
 }

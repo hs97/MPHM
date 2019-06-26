@@ -90,7 +90,10 @@ We can use `find_intersect` to collect the detailed intersection data, and use t
 
 ```{r}
 inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE.NAMES = TRUE) 
-bb <- lapply(country_list, bry_boschan, dat = hc)
+bb <- lapply(country_list, bry_boschan, dat = pp) %>%
+  reduce(full_join, by = "date")
+corr <- lapply(country_list, lag_corr, dat = hc_pp) %>%
+  bind_rows
 kable(head(inter$AU[7:10]))
 ```
 

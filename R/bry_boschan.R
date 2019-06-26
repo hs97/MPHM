@@ -2,7 +2,7 @@
 #' @import zoo
 #' @export
 
-bry_boschan <- function(dat, country, mincycle = 5, minphase = 1) {
+bry_boschan <- function(dat, country, mincycle = 5, minphase = 2) {
   dat_country <- dat %>%
     select("date", ends_with(country)) %>%
     na.omit()

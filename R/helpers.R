@@ -9,6 +9,11 @@ take_log <- function(x) {
   x
 }
 
+#' Deflating based on cpi
+#'
+#' @param x the data frame we want to take the log of
+#'
+#' @export
 deflate <- function(x, cpi, country) {
   cpi <- cpi %>%
     select(date, ends_with(country)) %>%

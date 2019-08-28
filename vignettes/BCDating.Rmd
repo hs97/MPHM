@@ -1,0 +1,48 @@
+---
+title: "Business Cycle Dating"
+author: "Haoyu Sheng"
+date: "8/7/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MPHM)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(purrr)
+library(zoo)
+library(ggplot2)
+library(gridExtra)
+library(readxl)
+```
+
+```{r prep, echo=FALSE, cache = TRUE}
+nhc <- read_excel('../data/HouseCredit_data.xlsx', sheet = "HouseCredit_NTcurr") %>%
+    rename(date = X__1) %>%
+    mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d")))
+nhc[nhc == 0] <- NA
+ngdp <- read_excel('../data/ngdp.xlsx', sheet = "ngdp") %>%
+    rename(date = X__1) %>%
+    mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d")))
+country_list <- colnames(nhc)[colnames(nhc) != "date"]
+```
+
+```{r, echo=FALSE}
+bcdate <- function(ngdp, nhc, country, lambda, minphase, lambda_hp) {
+  ks_cred2gdp <- ks_ratio_growth(nhc = nhc, ngdp = ngdp, country = country, lambda = lambda, minphase = minphase)
+  p1 <- plot_ratio(ks_cred2gdp, country = country)
+  p2 <- plot_growth(ks_cred2gdp)
+  ks_cred2gdp_hp <- ks_ratio_growth_hp(nhc = nhc, ngdp = ngdp, country = country, lambda = lambda, minphase = minphase, lambda_hp = lambda_hp)
+  p3 <- plot_ratio(ks_cred2gdp_hp, country = country, hp = TRUE)
+  p4 <- plot_growth(ks_cred2gdp_hp)
+  grid.arrange(arrangeGrob(p1, p2, top='KS'), arrangeGrob(p3, p4, top='KS with HP'), ncol = 2, top = country)
+}
+```
+
+```{r ratio, echo=FALSE, cache=TRUE, comment = NA}
+# List of all countries
+lapply(country_list, bcdate, nhc = nhc, ngdp = ngdp, lambda = 0.33, minphase = 4, lambda_hp = 1600 * 8)
+```
+

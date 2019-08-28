@@ -20,7 +20,7 @@ read_cpi <- function(x, y) {
   names(x)[-1] <- paste("cpi", country_list, sep = "_")
   # Choosing columns containing AR and CO from MacroVar
   y <- read_xlsx(y, sheet = "cpi") %>%
-    rename(date = X__1) %>%
+    rename(date = 1) %>%
     select(date, union(ends_with("AR"),  ends_with("CO"))) %>%
     mutate(date = as.yearqtr(date))
   # Combine the two to make a complete CPI dataset
@@ -41,7 +41,7 @@ read_cpi <- function(x, y) {
 
 read_hc <- function(x, cpi) {
   dat <- read_excel(x, sheet = "HouseCredit_NTcurr") %>%
-    rename(date = X__1) %>%
+    rename(date = 1) %>%
     mutate(date = as.yearqtr(date, format = "%Y-%m-%d"))
   dat[dat == 0] <- NA
   country_list <- colnames(dat)[colnames(dat) != "date"]
@@ -74,7 +74,7 @@ read_pp <- function(pps, ppl, pp_saar, cpi, country_list) {
   # Reformat strings to only contain country names
   names(ppl)[-1] <- substr(names(ppl)[-1], 3, 4)
   ppl_complete <- read_excel(pp_saar, sheet = "HousePriceIndex") %>%
-    rename(date = X__1) %>%
+    rename(date = 1) %>%
     mutate(date = as.yearqtr(date)) %>%
     # Merge SA&AR with ppl since they are both in nominal terms
     full_join(ppl, by = "date")
@@ -119,6 +119,7 @@ select_pp <- function(country, pp) {
 #' @import readxl
 #' @import zoo
 #' @import dplyr
+#' @import stringr
 #' @export
 read_mp <- function(x, path){
   mp <- read_excel(path, sheet = x, skip = 3) %>%
@@ -129,13 +130,14 @@ read_mp <- function(x, path){
   names(mp) <- as.character(unlist(mp[1,]))
   mp = mp[-1, ]
   # Reformat as mpaction_country
-  colnames(mp) <- paste(colnames(mp), x, sep = "_")
+  colnames(mp) <- paste(x, colnames(mp), sep = "_")
   mp %>%
     tibble::rownames_to_column("date") %>%
     mutate(date = as.Date(as.numeric(date), origin = "1899-12-30")) %>%
     na.omit() %>%
     mutate(date = as.yearqtr(date)) %>%
-    select(-starts_with("Grand Total"))
+    select(-starts_with("Grand Total")) %>%
+    mutate_if(is.character, str_trim)
 }
 
 #' This function reads in coverage years for macroprudential actions.
@@ -161,4 +163,25 @@ read_cy <- function(path) {
                             as.yearqtr(mp_end),
                             as.yearqtr(as.Date(timeFirstDayInQuarter(mp_end)) - 1))) %>% # Use last quarter as last date
     select(Country, mp_start, mp_end)
+}
+
+#' @import tidyr
+#' @export
+read_rates <- function(path) {
+  read_excel(path, sheet = "Data") %>%
+    rename(date = 1) %>%
+    gather(., 'key', 'value', - date) %>%
+    mutate(q = as.yearqtr(date)) %>%
+    group_by(key) %>%
+    arrange(date) %>%
+    na.omit %>%
+    mutate(change_in_rates = c(NA, diff(value)))%>%
+    group_by(key, q) %>%
+    summarize(change_in_rates = sum(change_in_rates, na.rm = TRUE)) %>%
+    mutate(policy = ifelse(change_in_rates > 0, 'tighten',
+                            ifelse(change_in_rates < 0, 'loosen',
+                                    ifelse(change_in_rates == 0, 'neither', NA)))) %>%
+    rename(date = q) %>%
+    select(date, key, policy) %>%
+    spread(., 'key', policy)
 }

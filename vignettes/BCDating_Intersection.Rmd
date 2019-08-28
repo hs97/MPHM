@@ -1,0 +1,66 @@
+---
+title: "BCDating with Property Price and Credit to GDP Ratio"
+author: "Haoyu Sheng"
+date: "8/15/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(MPHM)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(purrr)
+library(zoo)
+library(ggplot2)
+library(gridExtra)
+library(readxl)
+library(readr)
+```
+
+```{r prep, echo=FALSE, cache = TRUE}
+dates <- read_csv('../data/dates.csv')
+nhc <- read_excel('../data/HouseCredit_data.xlsx', sheet = "HouseCredit_NTcurr") %>%
+    rename(date = 1) %>%
+    mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d")))
+nhc[nhc == 0] <- NA
+ngdp <- read_excel('../data/ngdp.xlsx', sheet = "ngdp") %>%
+    rename(date = 1) %>%
+    mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d")))
+country_list <- colnames(nhc)[colnames(nhc) != "date"]
+ratio = lapply(country_list, calculate_ratio, nhc = nhc, ngdp = ngdp) %>%
+  reduce(full_join, by = "date") %>%
+  apply(X = dates, 1, reduce_coverage, dat = . ) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date")
+
+cpi <- read_cpi(x = "../data/cp1904.xlsx", y = "../data/MacroVar.xlsx")
+pp <- read_pp(pps = "../data/pp_selected.xlsx", ppl = "../data/pp_long.xlsx", 
+              pp_saar = "../data/HousePrices_SA&AR.xlsx", country_list = country_list, cpi = cpi) %>%
+  apply(X = dates, 1, reduce_coverage, dat = . ) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date") 
+country_list <- colnames(ratio)[colnames(ratio) != "date"]
+```
+
+```{r, echo=FALSE}
+bcdate <- function(pp, ratio, country, lambda, minphase, lambda_hp) {
+  ks_pp_hp <- ks_ratio_growth_hp(x = pp, country = country, lambda = lambda, minphase = minphase, lambda_hp = lambda_hp)
+  ks_cred2gdp_hp <- ks_ratio_growth_hp(x = ratio, country = country, lambda = lambda, minphase = minphase, lambda_hp = lambda_hp)
+  ks_cyc <- cyc_intercept(ks_pp = ks_pp_hp, ks_ratio = ks_cred2gdp_hp)
+  ks_pp_hp$cyc = ks_cyc
+  ks_cred2gdp_hp$cyc = ks_cyc
+  p1 <- plot_ratio(ks_pp_hp, country = country, hp = TRUE)
+  p2 <- plot_growth(ks_pp_hp)
+  p3 <- plot_ratio(ks_cred2gdp_hp, country = country, hp = TRUE)
+  p4 <- plot_growth(ks_cred2gdp_hp)
+  grid.arrange(arrangeGrob(p1, p2, top='Log Real Property Price'), arrangeGrob(p3, p4, top='Nominal Housing Credit to GDP Ratio'), ncol = 2, top = country)
+  }
+```
+
+```{r ratio, warnings=FALSE, echo=FALSE, cache=TRUE, comment = NA}
+# List of all countries
+lapply(country_list, bcdate, pp = pp, ratio = ratio, lambda =  0, minphase = 4, lambda_hp = 1600 * 40)
+```
+

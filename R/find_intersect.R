@@ -11,15 +11,25 @@ find_intersect <- function(x, country) {
 }
 
 #' This function turn the entries into NA if not covered in coverage years
-#' @param x coverage years
-#' @param mp macroprudential action data
+#' @param dates coverage years
+#' @param dat dataframe being reduced
+#' @param country which country to look at
+#' @param coverage_name which coverage to look at. We are usually using 'all'
 #'
 #' @import dplyr
 #' @export
-mp_reduce_range <- function(cy, mp) {
-  mp %>%
-    select(date, starts_with(cy["Country"])) %>%
-    filter((date >= cy["mp_start"]) & (date <= cy["mp_end"]))
+reduce_coverage <- function(dates, dat, coverage_name = 'all') {
+  dat <- dat %>%
+    select(date, ends_with(dates[["Country"]])) %>%
+    mutate(date = as.yearqtr(date)) %>%
+    # Filter out all the dates that are outside of valid coverage years
+    filter(date >= dates[[paste0(coverage_name, "_start")]], date <= dates[[paste0(coverage_name, "_end")]])
+  if (nrow(dat) < 13) {
+    # Return nothing if there are fewer than 13 entries
+    return ()
+  } else {
+    return(dat)
+  }
 }
 
 #' This function finds the start and end date of a country given a data series
@@ -56,4 +66,31 @@ find_start_end <- function(country, dat, dat_name){
 find_start_end_all <- function(country_list, dat, dat_name) {
   lapply(country_list, find_start_end, dat = dat, dat_name = dat_name) %>%
     rbindlist
+}
+
+#' This function summarizes the number of mp actions for a given country
+#' @param mp_hc the dataset merging macroprudential data and housing credit data
+#' @param country the country we are examining
+#' @export
+summarize_mp <- function(mp_hc, country) {
+  x <- mp_hc %>%
+    # Deselect the housing credit data column
+    select(-ends_with(country)) %>%
+    # Select the macroprudential data column
+    select(starts_with(country)) %>%
+    # Converting all values in cells into integer
+    sapply(., function(x) abs(as.integer(as.character(x))))
+  if (length(x) != 0) {
+    # Change all nonzero actions into 1, representing a quarter of action
+    x[x!=0] = 1
+    # Summing the quarters of actions
+    x %>%
+      colSums(., na.rm = TRUE) %>%
+      t %>%
+      as.data.frame() %>%
+      mutate() %>%
+      setnames(., colnames(.), gsub(paste0(country, '_'), "", colnames(.))) %>%
+      mutate(sum = rowSums(abs(.)),
+             country = country)
+  }
 }

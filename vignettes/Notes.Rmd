@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(MPHM)
 library(dplyr)
+library(tidyr)
 library(knitr)
 library(purrr)
 ```
@@ -45,7 +46,9 @@ We can use the `read_mp` function to read the macroprudential policy actions.
 ```{r mp, warning=FALSE}
 # The list of all actions. We can choose from this list what actions we want to look at
 indicators <- c("Housing_FX_limit", "Housing_LLprovisioning", "Housing_LTV", 
-                "Housing_OtherCapital", "Housing_RiskWeights", "Housing_tax", "LD_Ratio")
+                "Housing_OtherCapital", "Housing_RiskWeights", "Housing_tax",
+                "Housing_CCYB", 'Housing_DSTI', 'Housing_DTI_LTI', 'Housing_Exposure_limit',
+                "Housing_credGr_limit")
 mp = lapply(indicators, read_mp, path = "../data/MacroprudentialIndicators.xlsx") %>%
   reduce(full_join, by = "date")
 path = "../data/FinalDATA_11June2018.xlsx"
@@ -93,7 +96,10 @@ inter <- sapply(country_list, find_intersect, x = all_dat, simplify = FALSE, USE
 bb <- lapply(country_list, bry_boschan, dat = pp) %>%
   reduce(full_join, by = "date")
 corr <- lapply(country_list, lag_corr, dat = hc_pp) %>%
-  bind_rows
+  bind_rows %>%
+  gather("t", "corr", - country, - max_corr_t) %>%
+  select(country, corr, t) %>%
+  arrange_at("country")
 kable(head(inter$AU[7:10]))
 ```
 

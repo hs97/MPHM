@@ -1,3 +1,4 @@
+#' This function determines the phase based on the Bry-Boschan Algorithm
 #' @import BCDating
 #' @import zoo
 #' @export
@@ -6,6 +7,7 @@ bry_boschan <- function(dat, country, mincycle = 5, minphase = 2) {
   dat_country <- dat %>%
     select("date", ends_with(country)) %>%
     na.omit()
+  # Convert to time series
   dat_country_ts <- ts(select(dat_country, ends_with(country)), start = dat_country$date[1], freq = 4)
   try(
     {bb <- BBQ(dat_country_ts, mincycle, minphase)@states

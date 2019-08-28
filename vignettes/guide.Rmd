@@ -1,0 +1,172 @@
+---
+title: "Business Cycle Dating and Score Card Calculation - A Comprehensive Guide"
+author: "Haoyu Sheng"
+date: "8/28/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+library(knitr)
+library(gridExtra)
+library(MPHM)
+```
+
+## Introduction
+
+This is a guide on how to use the `MPHM` package to read in housing credit data, nominal GDP data, property price data, macroprudential action, and monetary policy data and to perform business cycle identification and score card calculation. 
+
+## Installation
+
+The package can be installed from Github. To install the package, you need to use tools from the package `devtools`. If you don't have this already, it can be installed with the command `install.packages("devtools")`
+
+Or if you already have `devtools`, simply load the package by typing `library(devtools)`. 
+
+Then you can use the command `install_github('hs97/MPHM')` to install this package. Once the package is installed, you can load it by typing `library(MPHM)`
+
+## Reading in Data
+
+The dataset `dates` contains information on the valid coverage years for each dataset for each country.
+
+```{r dates}
+data("dates")
+kable(head(dates[1:6]))
+```
+
+The dataset `mp` contains information on macroprudential actions related to housing. The categories of macroprudential policies include **Housing_FX_limit**, **Housing_LLprovisioning**, **Housing_LTV**, **Housing_OtherCapital**, **Housing_RiskWeights**, **Housing_tax**, **Housing_CCYB**, **Housing_DSTI**, **Housing_DTI_LTI**, **Housing_Exposure_limit**, **Housing_credGr_limit**. 
+
+
+```{r mp}
+data("mp")
+kable(head(mp[1:4]))
+```
+
+The dataset `ratio` contains information on the nominal credit to GDP ratio. 
+
+```{r ratio}
+data("ratio")
+kable(head(ratio[1:6]))
+```
+
+The dataset `pp` contains information on the logged real property prices. 
+
+```{r pp}
+data("pp")
+kable(head(pp[1:6]))
+```
+
+
+The dataset `mn` contains information on the monetary policy actions. 
+``` {r mn}
+data("mn")
+kable(head(mn[1:6]))
+```
+
+## Performing Business Cycle Identification
+
+We can use `AU` as an example. We can perform the Kuttner-Sheng method of phase identification using the property price data. The method smooths the input data with a HP filter of smoothing parameter `lambda_hp`, and finds the growth rate of the HP trend. The method also calculates the 3-year moving average of the actual growth rate and compares it with the HP trend growth. Any period that is `lambda` standard deviations above the HP trend growth is labelled as **Boom** and any period that is `lambda` standard deviations below the HP trend growth is labelled as **Bust**. Note that everything else is be in a **zone of inaction**. The `minphase` implementation ensures all booms and busts are at least a certain length. 
+
+```{r ks_pp}
+country <- 'AU'
+lambda <- 0.33
+minphase <- 4
+lambda_hp = 1600 * 40
+ks_pp <- ks_ratio_growth_hp(x = pp, country = country, 
+                            lambda = lambda, minphase = minphase,
+                            lambda_hp = lambda_hp)
+kable(head(ks_pp))
+```
+
+As we can see from above, the resulting columns are **AU**(this column name will vary by country), which documents either the logged real property price, or the nominal credit to GDP ratio, depending on which dataset we use, **trend**, which is the HP filter trend, **trend_growth**, which is the growth rate in the HP trend, **ma**, which is the three-year moving average of growth rates. 
+
+We use the deviation of the moving average of growth rates from the HP trend growth to determine **cyc**, and use the deviation of **AU** from **trend** to determine **gap_cyc**. 
+
+We can plot the cycle identification result based on the ks approach with the following functions: 
+
+```{r value_growth}
+# Plots the growth rate
+p1 <- plot_growth(ks_pp)
+# Plots the value(eitehr nhc/ngdp, or logged real pp)
+p2 <- plot_value(ks_pp, country = country, hp = TRUE)
+# Combine the two plots
+grid.arrange(p1, p2, ncol = 1, top = country)
+```
+
+We can do the same with the ratio data:
+
+```{r ratio_ks}
+ks_ratio <- ks_ratio_growth_hp(x = ratio, country = country, 
+                               lambda = lambda, minphase = minphase,
+                               lambda_hp = lambda_hp)
+# Plots the growth rate
+p1 <- plot_growth(ks_ratio)
+# Plots the value(eitehr nhc/ngdp, or logged real pp)
+p2 <- plot_value(ks_ratio, country = country, hp = TRUE)
+# Combine the two plots
+grid.arrange(p1, p2, ncol = 1, top = country)
+```
+
+We can even use the intersection of `ratio` and `pp` phase identification results to find a phase identification that is suitable for both `ratio` and `pp`! For this, it is best to use `lambda = 0`. 
+
+```{r}
+lambda <- 0 
+ks_pp_inter <- ks_ratio_growth_hp(x = pp, country = country, 
+                                  lambda = lambda, minphase = minphase, 
+                                  lambda_hp = lambda_hp)
+ks_ratio_inter <- ks_ratio_growth_hp(x = ratio, country = country, 
+                                     lambda = lambda, minphase = minphase, 
+                                     lambda_hp = lambda_hp)
+# Find the intersection of two cycle identification methods
+ks_cyc <- cyc_intercept(ks_pp = ks_pp_inter, ks_ratio = ks_ratio_inter)
+# Update the cycles
+ks_pp_inter$cyc = ks_cyc
+ks_ratio_inter$cyc = ks_cyc
+p1 <- plot_value(ks_pp_inter, country = country, hp = TRUE)
+p2 <- plot_growth(ks_pp_inter)
+p3 <- plot_value(ks_ratio_inter, country = country, hp = TRUE)
+p4 <- plot_growth(ks_ratio_inter)
+grid.arrange(arrangeGrob(p1, p2, top='Log Real Property Price'), 
+             arrangeGrob(p3, p4, top='Nominal Housing Credit to GDP Ratio'), 
+             ncol = 2, top = country)
+```
+
+## Score Card
+
+We can also produce score cards with ks identification results. 
+
+The `score_card` function returns a list of two tables: 1) a score card using the HP filter growth rate phase identification criteria, and 2) a score card using the gap phase identification criteria. The horizontal axis labels the results of business cycle identification, and the vertical axis labels the nature of macroprudential actions. 
+
+```{r, results='asis'}
+# Property Price Score Card
+pp_scores <- score_card(ks_dat = ks_pp, mp = mp, country = country)
+print(kable(pp_scores$hp, caption = paste('Property Price HP trend Score for ', country)))
+print(kable(pp_scores$gap, caption = paste('Property Price Gap Score for ', country)))
+```
+
+We can do the same for ratio identification: 
+
+```{r, results='asis'}
+# Property Price Score Card
+ratio_scores <- score_card(ks_dat = ks_ratio, mp = mp, country = country)
+kable(ratio_scores$hp, caption = paste('Ratio HP trend Score for ', country))
+kable(ratio_scores$gap, caption = paste('Ratio Gap Score for ', country))
+```
+
+We can also print out the contingency table of these two methods of identification using `contingency_table`. The vertical axis records business cycle identification from property price data, and the horizontal one records that from nominal credit to GDP ratio. 
+
+```{r, results='asis'}
+ct <- contingency_table(ks_pp = ks_pp, ks_ratio = ks_ratio, country = country)
+kable(ct, caption = paste('Contingency table for cycle identification for ', country))
+```
+
+Lastly, we can print the contingency table for monetary policy and macroprudential policy, to examine whether coordination or the lack thereof. The vertical axis labels macroprudential actions, whereas the horizontal axis labels monetary policy actions.
+
+```{r}
+mn_mp_scores <- monetary_macroprudential(mp = mp, monetary = mn, country = country)
+kable(mn_mp_scores, caption = paste('Contingency table between monetary policy and macroprudential policy for ', country))
+```
+
+
+
+
+

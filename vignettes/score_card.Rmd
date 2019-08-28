@@ -1,0 +1,93 @@
+---
+title: "Score Card"
+author: "Haoyu Sheng"
+date: "8/12/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message = FALSE)
+library(MPHM)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(purrr)
+library(readxl)
+library(zoo)
+library(readr)
+```
+
+
+```{r prep, echo=FALSE, cache = TRUE}
+dates <- read_csv('../data/dates.csv')
+nhc <- read_excel('../data/HouseCredit_data.xlsx', sheet = "HouseCredit_NTcurr") %>%
+    rename(date = 1) %>%
+    mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d")))
+nhc[nhc == 0] <- NA
+ngdp <- read_excel('../data/ngdp.xlsx', sheet = "ngdp") %>%
+    rename(date = 1) %>%
+    mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d")))
+country_list <- colnames(nhc)[colnames(nhc) != "date"]
+ratio = lapply(country_list, calculate_ratio, nhc = nhc, ngdp = ngdp) %>%
+  reduce(full_join, by = "date") %>%
+  apply(X = dates, 1, reduce_coverage, dat = . ) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date")
+
+cpi <- read_cpi(x = "../data/cp1904.xlsx", y = "../data/MacroVar.xlsx")
+pp <- read_pp(pps = "../data/pp_selected.xlsx", ppl = "../data/pp_long.xlsx", 
+              pp_saar = "../data/HousePrices_SA&AR.xlsx", country_list = country_list, cpi = cpi) %>%
+  apply(X = dates, 1, reduce_coverage, dat = . ) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date") 
+country_list <- colnames(ratio)[colnames(ratio) != "date"]
+```
+
+```{r mp, warning=FALSE, echo=FALSE}
+# The list of all actions. We can choose from this list what actions we want to look at
+indicators <- c("Housing_FX_limit", "Housing_LLprovisioning", "Housing_LTV", 
+                "Housing_OtherCapital", "Housing_RiskWeights", "Housing_tax",
+                "Housing_CCYB", 'Housing_DSTI', 'Housing_DTI_LTI', 'Housing_Exposure_limit',
+                "Housing_credGr_limit")
+mp <- lapply(indicators, read_mp, path = "../data/MacroprudentialIndicators.xlsx") %>%
+  reduce(full_join, by = "date")
+mp <- apply(dates, 1, reduce_coverage, dat = mp) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date")
+```
+
+```{r, warnings=FALSE, echo=FALSE, message = FALSE}
+ks_dat_ratio <- sapply(country_list, ks_ratio_growth_hp, x = ratio, 
+                    lambda = 0.33, minphase = 4,
+                    lambda_hp = 1600 * 40, logged = FALSE, simplify = FALSE,  USE.NAMES = TRUE)
+ks_dat_pp <- sapply(country_list, ks_ratio_growth_hp, x = pp, 
+                    lambda = 0.33, minphase = 4,
+                    lambda_hp = 1600 * 40, logged = TRUE, simplify = FALSE,  USE.NAMES = TRUE)
+```
+
+
+```{r, warnings = FALSE, echo=FALSE, message = FALSE}
+countries_with_enough_actions <- read_csv("../data/avail_mp.csv") %>%
+  select(sum, country) %>%
+  filter(sum >= 6) %>%
+  .$country
+```
+
+There are a total of `r length(countries_with_enough_actions)` countries with more than 6 macroprudential actions. For the contingency tables, the vertical axis records business cycle identification from property price data, and the horizontal one records that from nominal credit to GDP ratio. 
+
+
+```{r, results='asis', echo=FALSE}
+for (country in countries_with_enough_actions) {
+  pp_scores <- score_card(ks_dat = ks_dat_pp, mp = mp, country = country)
+  print(kable(pp_scores$hp, caption = paste('Property Price HP trend Score for ', country)))
+  print(kable(pp_scores$gap, caption = paste('Property Price Gap Score for ', country)))
+  ratio_scores <- score_card(ks_dat = ks_dat_ratio, mp = mp, country = country)
+  print(kable(ratio_scores$hp, caption = paste('Credit to GDP ratio HP trend Score for ', country)))
+  print(kable(ratio_scores$gap, caption = paste('Credit to GDP ratio Gap Score for ', country)))
+  print(kable(contingency_table(ks_pp = ks_dat_pp, ks_ratio = ks_dat_ratio, country = country), caption = paste('Contingency table for cycle identification for ', country)))
+  print(kable(prop.table(contingency_table(ks_pp = ks_dat_pp, ks_ratio = ks_dat_ratio, country = country)), caption = paste('Contingency table for cycle identification for ', country)))
+
+}
+```
+
+

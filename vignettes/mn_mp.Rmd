@@ -1,0 +1,51 @@
+---
+title: "Monetary Policy vs. Macroprudential Policy"
+author: "Haoyu Sheng"
+date: "8/16/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, echo = FALSE)
+library(MPHM)
+library(readr)
+library(dplyr)
+library(knitr)
+library(purrr)
+```
+
+```{r}
+dates <- read_csv('../data/dates.csv')
+countries_with_enough_actions <- read_csv("../data/avail_mp.csv") %>%
+  select(sum, country) %>%
+  filter(sum >= 6) %>%
+  .$country
+indicators <- c("Housing_FX_limit", "Housing_LLprovisioning", "Housing_LTV", 
+                "Housing_OtherCapital", "Housing_RiskWeights", "Housing_tax",
+                "Housing_CCYB", 'Housing_DSTI', 'Housing_DTI_LTI', 'Housing_Exposure_limit',
+                "Housing_credGr_limit")
+mp <- lapply(indicators, read_mp, path = "../data/MacroprudentialIndicators.xlsx") %>%
+  reduce(full_join, by = "date")
+mp <- apply(dates, 1, reduce_coverage, dat = mp) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date")
+monetary <- read_rates(path = '../data/policyrates.xlsx')
+monetary <- apply(dates, 1, reduce_coverage, dat = monetary) %>%
+  Filter(Negate(is.null), .) %>%
+  reduce(full_join, by = "date")
+countries_available_in_mn <- colnames(monetary)[-1] %>%
+  gsub(pattern = 'R_', replacement = '', .)
+country_list <- intersect(countries_available_in_mn,countries_with_enough_actions)
+```
+
+The vertical axis labels macroprudential actions, whereas the horizontal axis labels monetary policy actions. 
+
+```{r, results='asis', echo=FALSE}
+for (country in country_list) {
+  mn_mp_scores <- monetary_macroprudential(mp = mp, monetary = monetary, country = country)
+  print(kable(mn_mp_scores, caption = paste('Contingency table between monetary policy and macroprudential policy for ', country)))
+  print(kable(prop.table(mn_mp_scores, margin = 1), caption = paste('Marginal Percentage with respect to macroprudential actions', country)))
+
+}
+```
+
